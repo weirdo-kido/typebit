@@ -1,0 +1,302 @@
+<!-- 
+  Project: typebit
+  Architecture: Append-Only Log / Staging Buffer
+  License: GNU GPL v2.0
+-->
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, interactive-widget=resizes-content">
+  <meta name="color-scheme" content="light">
+  <meta name="theme-color" content="#f0faff">
+  <title>typebit</title>
+  <meta name="description" content="typebit - An Append-Only Log digital art. Native JS performance art.">
+  <meta name="keywords" content="Native JS, GPLv2">
+  <link rel="canonical" href="https://weirdo-kido.github.io/typebit/">
+  <link rel="icon" type="img/png" href="favicon.png">
+<style>
+  :root {
+    --crimson: #ff003c; 
+    --divine-blue: #0088cc; 
+    --purified-bg: #f0faff;   
+    --holy-gold: #ffcc00; 
+    --abyss-bg: #221111; 
+    --terminal-bg: #1a1a1a;
+  }
+  
+  *, *::before, *::after { 
+    box-sizing: border-box; 
+    -webkit-tap-highlight-color: transparent; 
+  }
+
+  body { 
+    background: var(--purified-bg); 
+    color: var(--divine-blue);
+    font-family: system-ui, -apple-system, sans-serif;
+    margin: 0 auto; 
+    display: flex; 
+    justify-content: center;
+    height: 100dvh; 
+    overflow: hidden; 
+    max-width: 409px;
+  }
+  
+  .container { 
+    width: 92%; 
+    height: 100%;
+    display: flex; 
+    flex-direction: column; 
+    justify-content: flex-end;
+    padding: 20px 0; 
+    padding-bottom: max(20px, env(safe-area-inset-bottom)); 
+    margin-top: auto;
+    transform-origin: center bottom;
+    will-change: transform, filter;
+    backface-visibility: hidden;
+  }
+
+  #log { 
+    flex: 1; 
+    width: 100%; 
+    max-height: 100dvh; 
+    background: #eee; 
+    border: 1px solid #ddd;
+    padding: 15px; 
+    color: var(--divine-blue); 
+    overflow-y: auto; 
+    overscroll-behavior-y: smooth; 
+    white-space: pre-wrap;
+    word-break: break-all; 
+    border-radius: 12px; 
+    font-size: 16px; 
+    font-weight: 425; 
+    line-height: 1.5;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.1); 
+    scrollbar-width: none; 
+    transition: background 0.3s ease, color 0.3s ease; 
+    -webkit-overflow-scrolling: touch; 
+    pointer-events: auto; 
+    user-select: none;
+  }
+
+  #bufferDisplay { 
+    width: 100%; 
+    height: 48px; 
+    background: var(--abyss-bg); 
+    border: 1px solid var(--crimson);
+    padding: 12px; 
+    color: var(--crimson); 
+    font-size: 16px; 
+    font-family: 'ui-monospace', 'Cascadia Code', 'Source Code Pro', Menlo, Monaco, 'Courier New', monospace;
+    border-radius: 12px; 
+    display: flex; 
+    align-items: center;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); 
+    overflow: hidden;
+    text-shadow: 0 0 8px var(--crimson);
+    pointer-events: none;
+    white-space: nowrap; 
+    text-overflow: ellipsis;
+    margin: 12px 12px 4px 0px;
+    contain: layout;
+  }
+
+  #bufferDisplay::after { 
+    content: '-'; 
+    margin-left: 2px; 
+    color: var(--holy-gold); 
+    font-weight: bold;
+    text-shadow: 0 0 10px var(--holy-gold); 
+    animation: darkaim 3s infinite; 
+  }
+
+  @keyframes darkaim { 
+    0%, 10%, 80%, 100% { opacity: 1; } 
+    12%, 20%, 75% { opacity: 0; } 
+    40% { opacity: 0.3; }
+  }
+
+  .supernova { 
+    animation: shake cubic-bezier(.87,-.41,.19,1.44) both;
+    background: var(--abyss-bg) !important;
+    transition: none !important;
+  }
+
+  @keyframes shake {
+    0% { transform: scale(1) translate3d(0,0,0) rotate(0deg); filter: brightness(3) contrast(2); }
+    30% { transform: scale(0.9, 1.2) translate3d(48px, 20px, 100px) rotate(-2deg); filter: brightness(2); }
+    50% { transform: scale(1.1, 0.8) translate3d(-48px, -60px, 500px) rotate(3deg); }
+    95% { transform: scale(0.98, 1.02) translate3d(-2px, 10px, 0) rotate(-1deg); }
+    100% { transform: scale(1) translate3d(0,0,0) rotate(0deg); }
+  }
+ 
+  .supernova #log {
+    background: var(--divine-blue) !important;
+    color: var(--divine-blue) !important;
+    border: 0px solid var(--holy-gold);
+    max-height: 24px;
+  }
+  
+  .supernova #bufferDisplay {
+    background: var(--holy-gold);
+    max-height: 8px;
+    color: var(--holy-gold);
+    text-shadow: none !important;
+    border: 0 solid var(--holy-gold);
+  }
+
+  .purifier {
+    background: var(--purified-bg) !important;
+    filter: contrast(1.2) saturate(1.5);
+  }
+  
+  .purifier #log {
+    background: var(--divine-blue) !important;
+    box-shadow: 0 0 24px var(--divine-blue);
+  }
+
+  #ghostInput {
+    position: absolute; bottom: 0; left: 0; width: 100%; height: 48px;
+    opacity: 0; caret-color: transparent;
+    font-size: 16px; -webkit-user-select: none; user-select: none;
+    z-index: 10;
+  }
+
+  .meta { 
+    display: flex; 
+    justify-content: space-between; 
+    font-size: 10px; 
+    color: #999; 
+    font-family: sans-serif; 
+    font-weight: bold; 
+  }
+  
+  .flash { 
+    color: var(--crimson) !important;
+    background: var(--abyss-bg) !important;
+    padding: 0 4px;
+  }
+  
+  .heal {
+    color: var(--divine-blue) !important;
+    text-shadow: none !important;
+  }
+
+  .masochist {
+    color: var(--holy-gold) !important;
+  }
+</style>
+
+</head>
+<body>
+
+<div class="container">
+  <div id="log" aria-live="polite" aria-atomic="false">Archpriest</div>
+  <main>
+  <div class="buffer-zone">
+    <div id="bufferDisplay">Dunia Memanggil</div>
+    <input type="text" id="ghostInput" maxlength="30" autocomplete="off" spellcheck="false" enterkeyhint="send" aria-label="type command">
+    <div class="meta">
+      <span id="status">SPELL</span>
+      <span><span id="cnt">0</span>/30</span>
+    </div>
+  </div>
+  </main>
+</div>
+
+<script>
+  const log = document.getElementById('log'), ghost = document.getElementById('ghostInput'),
+        display = document.getElementById('bufferDisplay'), cnt = document.getElementById('cnt'),
+        status = document.getElementById('status'), body = document.body;
+
+  const hints = ["low mana...","Gathering Power...","SUPERNOVA!"];
+  
+  const updateDisplay = (v) => { 
+    display.textContent = v || hints[0]; 
+    cnt.textContent = v.length; 
+  };
+
+  const focusGhost = () => { ghost.focus(); setTimeout(() => ghost.setSelectionRange(30, 30), 10); };
+  window.addEventListener('click', focusGhost);
+
+  const spell ="SPELL";
+  const executeCmd = async (cmd) => {
+    const text = log.textContent.trim();
+    
+    if (cmd === ',expl') {
+      if (!text || (text.length < 31)) return flash("ムリ");
+      try {
+        await navigator.clipboard.writeText(text);
+        body.classList.add('supernova');
+        log.textContent = "MASTER-SAAAN!!";
+        flash("SUPERNOVA!!"); 
+        setTimeout(() => body.classList.remove('supernova'), 2000);
+        ghost.blur();
+      } catch (e) { flash("ポタト"); }
+      
+    } else if (cmd === ',prf') {
+      body.classList.add('purifier');
+      ghost.blur();
+      log.textContent = "WQWQWQ";
+      heal("CLEANSE!");
+      setTimeout(() => body.classList.remove('purifier'), 400);
+      
+    } else if (cmd === ',tin') {
+      body.classList.add('knight');
+      knight("Don't call me by that Name!");
+      setTimeout(() => body.classList.remove ('knight'), 1000);
+    }
+  };
+
+  const push = () => {
+    const v = ghost.value.trim();
+    if (!v) return;
+
+    if (v.startsWith(',')) { 
+      executeCmd(v.toLowerCase()); 
+      ghost.value = ''; updateDisplay('');
+      return;
+    } 
+
+    let lines = log.textContent.split('\n'); 
+    if (lines.length > 50) {
+      log.textContent = "SHUT-IN\n" + lines.slice(-49).join('\n');
+    }
+
+    log.textContent += '\n> ' + v; 
+    ghost.value = ''; 
+    updateDisplay('');
+    log.scrollTop = log.scrollHeight;
+  };
+
+  ghost.addEventListener('input', () => { updateDisplay(ghost.value); if (ghost.value.length >= 30) push(); });
+  ghost.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); push(); } });
+
+
+
+  function flash(t) { 
+    status.classList.remove('flash');
+    status.textContent = t; status.classList.add('flash'); 
+    setTimeout(() => { status.textContent = spell; status.classList.remove('flash'); }, 500); 
+  }
+  
+  function heal(t) {
+    status.classList.remove('heal');
+    status.textContent = t; status.classList.add('heal');
+    setTimeout(() => { status.textContent = spell; status.classList.remove('heal'); }, 2000);
+  }
+
+  function knight(t) {
+    status.classList.remove('masochist');
+    status.textContent = t; status.classList.add('masochist');
+    setTimeout(() => { status.textContent = spell; status.classList.remove('masochist'); }, 1000);
+  }
+
+  setInterval(() => { 
+    if (!ghost.value) { display.textContent = hints[Math.floor(Date.now()/3000) % hints.length]; } 
+  }, 3000);
+</script>
+</body>
+</html>

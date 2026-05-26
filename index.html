@@ -47,8 +47,8 @@
     width: 92%; 
     height: 100%;
     display: flex; 
-    flex-direction: column; 
-    justify-content: flex-end;
+    flex-direction: column-reverse; 
+    justify-content: flex-start;
     padding: 20px 0; 
     padding-bottom: max(20px, env(safe-area-inset-bottom)); 
     margin-top: auto;
@@ -79,6 +79,7 @@
     -webkit-overflow-scrolling: touch; 
     pointer-events: auto; 
     user-select: none;
+    transform: scaleY(-1);
   }
 
   #bufferDisplay { 
